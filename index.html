@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retina Lab — Línea de tiempo de mantenciones en terreno</title>
+<style>
+  :root{
+    --ink:#0D2B3E;
+    --teal:#14807D;
+    --teal-soft:#DCEEEC;
+    --coral:#D6493B;
+    --coral-soft:#FBE4E1;
+    --amber:#C9862B;
+    --slate:#64748B;
+    --slate-light:#A6B0B9;
+    --bg:#F6F5F1;
+    --card:#FFFFFF;
+    --line:#E2E5E7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    padding:36px 40px 24px;
+    border-bottom:1px solid var(--line);
+    background:var(--card);
+  }
+  header h1{
+    margin:0 0 6px;
+    font-size:26px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  header p{
+    margin:0;
+    color:var(--slate);
+    font-size:14.5px;
+    max-width:740px;
+    line-height:1.5;
+  }
+  .kpis{
+    display:flex;
+    gap:14px;
+    padding:20px 40px;
+    flex-wrap:wrap;
+  }
+  .kpi{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 20px;
+    min-width:160px;
+    flex:1;
+  }
+  .kpi .num{
+    font-size:28px;
+    font-weight:700;
+    line-height:1;
+  }
+  .kpi.alert .num{ color:var(--coral); }
+  .kpi .label{
+    margin-top:6px;
+    font-size:12.5px;
+    color:var(--slate);
+    line-height:1.4;
+  }
+  .controls{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:0 40px 20px;
+    flex-wrap:wrap;
+  }
+  .controls label{
+    font-size:13px;
+    color:var(--slate);
+    font-weight:600;
+    margin-right:6px;
+  }
+  select, .toggle{
+    font-family:inherit;
+    font-size:13.5px;
+    padding:7px 12px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--ink);
+  }
+  .toggle{
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    user-select:none;
+  }
+  .toggle input{ accent-color:var(--coral); width:15px; height:15px; }
+  .legend{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    padding:0 40px 22px;
+    font-size:12.5px;
+    color:var(--slate);
+  }
+  .legend-item{ display:flex; align-items:center; gap:7px; }
+  .dot-sample{ width:11px; height:11px; border-radius:50%; display:inline-block; flex:none; }
+  .ring-sample{ width:11px; height:11px; border-radius:50%; display:inline-block; border:2px solid var(--coral); flex:none; }
+
+  main{ padding:6px 0 60px; }
+  .company-group{ margin-bottom:6px; }
+  .company-header{
+    padding:18px 40px 8px;
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink);
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .company-header .count{
+    font-weight:400;
+    color:var(--slate);
+    font-size:12.5px;
+  }
+  .scroll-outer{
+    overflow-x:auto;
+    padding:0 40px 10px;
+  }
+  .timeline-grid{
+    display:grid;
+    grid-template-columns: 176px 1fr;
+    min-width:1180px;
+  }
+  .axis-label-spacer{
+    position:sticky; left:0; z-index:3;
+    background:var(--bg);
+  }
+  .axis-track{
+    position:relative;
+    height:26px;
+  }
+  .month-tick{
+    position:absolute;
+    top:0;
+    bottom:0;
+    border-left:1px solid var(--line);
+    font-size:10.5px;
+    color:var(--slate-light);
+    padding-left:5px;
+    padding-top:4px;
+    white-space:nowrap;
+  }
+  .center-row{ display:contents; }
+  .center-label{
+    position:sticky; left:0; z-index:2;
+    background:var(--bg);
+    display:flex;
+    align-items:center;
+    padding:10px 12px 10px 0;
+    font-size:12.5px;
+    font-weight:600;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  .center-label .flag{
+    color:var(--coral);
+    margin-right:6px;
+    font-size:11px;
+  }
+  .center-track{
+    position:relative;
+    border-bottom:1px solid var(--line);
+    height:38px;
+  }
+  .center-track .baseline{
+    position:absolute;
+    left:0; right:0; top:50%;
+    height:1px;
+    background:var(--line);
+  }
+  .grid-line{
+    position:absolute;
+    top:0; bottom:0;
+    border-left:1px dashed var(--line);
+  }
+  .visit-dot{
+    position:absolute;
+    top:50%;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    transform:translate(-50%,-50%);
+    cursor:pointer;
+    transition:transform .12s ease;
+  }
+  .visit-dot:hover{ transform:translate(-50%,-50%) scale(1.5); z-index:5; }
+  .visit-dot.temprana{
+    width:14px; height:14px;
+    box-shadow:0 0 0 2px var(--coral);
+  }
+  .visit-dot.temprana.otro-tecnico{
+    box-shadow:0 0 0 2px var(--coral), 0 0 0 4px var(--card), 0 0 0 5px var(--coral);
+  }
+  .visit-dot.tipo-instalacion, .tipo-instalacion{ background:var(--teal); }
+  .visit-dot.tipo-preventiva, .tipo-preventiva{ background:#6D8FA6; }
+  .visit-dot.tipo-correctiva, .tipo-correctiva{ background:var(--coral); }
+  .visit-dot.tipo-desinstalacion, .tipo-desinstalacion{ background:var(--slate-light); }
+  .visit-dot.tipo-pendiente, .tipo-pendiente{ background:var(--amber); }
+  .visit-dot.tipo-otro, .tipo-otro{ background:var(--slate-light); }
+
+  #tooltip{
+    position:fixed;
+    pointer-events:none;
+    background:var(--ink);
+    color:#fff;
+    padding:12px 14px;
+    border-radius:9px;
+    font-size:12.5px;
+    line-height:1.5;
+    max-width:290px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+    opacity:0;
+    transition:opacity .1s ease;
+    z-index:50;
+  }
+  #tooltip.show{ opacity:1; }
+  #tooltip .tt-title{ font-weight:700; margin-bottom:4px; font-size:13px; }
+  #tooltip .tt-row{ color:#C3D2D8; }
+  #tooltip .tt-chain{ margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,.15); }
+  #tooltip .tt-flag{ color:#FF9E92; font-weight:600; margin-top:4px; display:block; }
+  #tooltip .tt-error-tag{
+    display:inline-block; font-size:11.5px; font-weight:700; color:#fff;
+    background:var(--coral); padding:2px 9px; border-radius:5px; margin-bottom:5px;
+  }
+  #tooltip .tt-resumen{ color:#fff; margin-bottom:6px; }
+  #tooltip .tt-badge{
+    display:inline-block; margin-top:5px; font-size:10.5px; font-weight:700;
+    padding:2px 8px; border-radius:20px;
+  }
+  #tooltip .tt-badge.same{ background:#1E4A47; color:#7FE0D6; }
+  #tooltip .tt-badge.diff{ background:#5A2420; color:#FFB0A6; }
+
+  footer{
+    padding:18px 40px 40px;
+    font-size:11.5px;
+    color:var(--slate-light);
+  }
+
+  @media (max-width: 720px){
+    header, .kpis, .controls, .legend, .company-header, footer{ padding-left:18px; padding-right:18px; }
+    .scroll-outer{ padding-left:18px; padding-right:18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Salidas a terreno por centro — Retina Lab</h1>
+  <p id="headerSub">Cada punto es una visita registrada. Los puntos con anillo rojo llegaron antes del plazo esperado de mantención (60 días v4 / 90 días v4.5).</p>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="controls">
+  <div>
+    <label for="empresaFilter">Empresa</label>
+    <select id="empresaFilter"></select>
+  </div>
+  <div>
+    <label for="errorFilter">Tipo de error</label>
+    <select id="errorFilter"></select>
+  </div>
+  <label class="toggle">
+    <input type="checkbox" id="onlyFlagged">
+    Solo centros con visitas tempranas
+  </label>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<main id="main"></main>
+
+<div id="tooltip"></div>
+
+<footer>Fuente: Certificado de Servicios — Respuestas de formulario · año 2026 · Tipo de error y resumen clasificados manualmente para las visitas tempranas.</footer>
+
+<script>
+const DATA = [{"empresa": "Sin empresa registrada", "centro": "Temuan", "fecha": "2026-09-05", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Elefante", "fecha": "2026-01-06", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 74, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Elefante", "fecha": "2026-02-20", "tipo": "Mantención correctiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 45, "plazo_esperado": 60, "problema": "Se cambia motor Z y sensor endstop Z, por enfoque no estable,se cambia placa de muestreo", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla motor Z", "mismo_tecnico": false}, {"empresa": "Aqua Chile", "centro": "Elefante", "fecha": "2026-04-27", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 66, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Elefante", "fecha": "2026-06-22", "tipo": "Desinstalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "", "dias_desde_anterior": 56, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Izaza", "fecha": "2026-04-08", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Izaza", "fecha": "2026-09-03", "tipo": "Desinstalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "", "dias_desde_anterior": 148, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Melchor 4", "fecha": "2026-01-07", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 62, "plazo_esperado": 60, "problema": "1. Placa (Carrier), No carga agua, Bomba interna sin funcionar ", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Melchor 4", "fecha": "2026-02-05", "tipo": "Desinstalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 29, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Pescadores", "fecha": "2026-06-24", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "", "modelo": "4", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Pescadores", "fecha": "2026-08-05", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4", "dias_desde_anterior": 42, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Tahuenahuec", "fecha": "2026-03-09", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Tahuenahuec", "fecha": "2026-09-04", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 179, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Teresa 1", "fecha": "2026-02-05", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Teresa 1", "fecha": "2026-05-14", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 98, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Aqua Chile", "centro": "Teresa 1", "fecha": "2026-07-02", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 49, "plazo_esperado": 60, "problema": "Buffer vacío (carga aire a la placa), No carga agua, Bomba descebada (sin agua)", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla bomba externa", "mismo_tecnico": false}, {"empresa": "Baja Aqua Farms", "centro": "Isla Coronado", "fecha": "2026-01-13", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "", "modelo": "4", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Baja Aqua Farms", "centro": "Isla Coronado", "fecha": "2026-06-30", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "", "dias_desde_anterior": 168, "plazo_esperado": 60, "problema": "6. Sistema de Fluidos", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Baja Trout", "centro": "Ensenada", "fecha": "2026-01-13", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "", "modelo": "4", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Baja Trout", "centro": "Ensenada", "fecha": "2026-07-02", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 170, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Acopio Chinquihue", "fecha": "2026-04-13", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "Factor humano", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Acopio Chinquihue", "fecha": "2026-05-18", "tipo": "Desinstalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "", "dias_desde_anterior": 35, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "Factor humano", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Acopio Chinquihue", "fecha": "2026-09-01", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "", "dias_desde_anterior": 106, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "Factor humano", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Acopio Chinquihue", "fecha": "2026-09-03", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "", "dias_desde_anterior": 2, "plazo_esperado": 90, "problema": "", "temprana": true, "tipo_error": "Factor humano", "resumen": "Tornillo suelto eje", "mismo_tecnico": true}, {"empresa": "Cermaq", "centro": "Acopio Quemchi", "fecha": "2026-09-02", "tipo": "Sin tipo", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "", "modelo": "", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "Factor humano", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Acopio Quemchi", "fecha": "2026-09-04", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 2, "plazo_esperado": 90, "problema": "", "temprana": true, "tipo_error": "Factor humano", "resumen": "BTT quemada", "mismo_tecnico": true}, {"empresa": "Cermaq", "centro": "Chidhuapi 2", "fecha": "2026-08-31", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Chidhuapi 2", "fecha": "2026-09-03", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 3, "plazo_esperado": 90, "problema": "", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla raspi", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "El Manzano", "fecha": "2026-03-27", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "El Manzano", "fecha": "2026-04-21", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 25, "plazo_esperado": 90, "problema": "Sensor Z defectuoso o mala conexión/mal crimpeado a Octopus, 3. Raspberry Pi (Control)", "temprana": true, "tipo_error": "Factor humano", "resumen": "Mala conexión/mal crimpeado", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "El Manzano", "fecha": "2026-07-28", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 98, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "El Manzano", "fecha": "2026-08-31", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "", "dias_desde_anterior": 34, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Estero Conche", "fecha": "2026-01-04", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 7, "plazo_esperado": 60, "problema": "Barredor atascado, Starlink sin conexión ", "temprana": true, "tipo_error": "Internet", "resumen": "Se reemplaza Starlink", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "Estero Conche", "fecha": "2026-01-21", "tipo": "Desinstalación", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 17, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Grip Explorer", "fecha": "2026-03-12", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 85, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Grip Explorer", "fecha": "2026-08-11", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 152, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Imelev", "fecha": "2026-01-08", "tipo": "Mantención correctiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 28, "plazo_esperado": 60, "problema": "Bam", "temprana": true, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Imelev", "fecha": "2026-03-12", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 63, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Imelev", "fecha": "2026-05-14", "tipo": "Desinstalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "", "dias_desde_anterior": 63, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Luchin", "fecha": "2026-01-22", "tipo": "Instalación", "tecnico": "Daniel Muñoz", "tecnico_anterior": "", "modelo": "4", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Luchin", "fecha": "2026-04-26", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 94, "plazo_esperado": 60, "problema": "1. Placa (Carrier), Barredor atascado", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Luchin", "fecha": "2026-05-15", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 19, "plazo_esperado": 90, "problema": "Filtración de agua al interior del tablero ", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Se cambia a v4.5", "mismo_tecnico": true}, {"empresa": "Cermaq", "centro": "Luchin", "fecha": "2026-08-07", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 84, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Punta Gruesa", "fecha": "2026-01-23", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 64, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Punta Gruesa", "fecha": "2026-02-19", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 27, "plazo_esperado": 60, "problema": "", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla raspi", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "Punta Gruesa", "fecha": "2026-02-26", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 7, "plazo_esperado": 60, "problema": "1. Placa (Carrier), Filtración de líquido en la placa", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla raspi", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "Punta Gruesa", "fecha": "2026-03-20", "tipo": "Desinstalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 22, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Ronia Diamond", "fecha": "2026-02-17", "tipo": "Mantención correctiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "", "modelo": "4", "dias_desde_anterior": null, "plazo_esperado": 60, "problema": "Se realiza mantencion correctiva por rotura de filtro de agua, se reemplaza botella y filtro, se prueban las 3 profundidades sin observaciones . Se deja un acolchado detras de botella", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Ronia Diamond", "fecha": "2026-03-25", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 36, "plazo_esperado": 60, "problema": "", "temprana": true, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Ronia Diamond", "fecha": "2026-05-28", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán, Wilmer Ruiz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 64, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Ronia Diamond", "fecha": "2026-08-11", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Ángelo Guzmán, Wilmer Ruiz", "modelo": "4", "dias_desde_anterior": 75, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Sureste", "fecha": "2026-01-27", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 49, "plazo_esperado": 60, "problema": "Bomba descebada (sin agua), Rotura de conectores de mangueras", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Conectores rotos", "mismo_tecnico": true}, {"empresa": "Cermaq", "centro": "Sureste", "fecha": "2026-04-07", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 70, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Sureste", "fecha": "2026-05-22", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 45, "plazo_esperado": 60, "problema": "Bomba en mal estado", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla bomba externa", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "Sureste", "fecha": "2026-07-06", "tipo": "Desinstalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "", "dias_desde_anterior": 45, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Yelcho", "fecha": "2026-06-25", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Cermaq", "centro": "Yelcho", "fecha": "2026-06-30", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 5, "plazo_esperado": 90, "problema": "Filtración de líquido en la placa", "temprana": true, "tipo_error": "Factor humano", "resumen": "Filtración placa", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "Yelcho", "fecha": "2026-07-17", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 17, "plazo_esperado": 90, "problema": "CANALIZACIONES ", "temprana": true, "tipo_error": "Factor humano", "resumen": "Arreglo canalizaciones", "mismo_tecnico": false}, {"empresa": "Cermaq", "centro": "Yelcho", "fecha": "2026-07-21", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 4, "plazo_esperado": 90, "problema": "CABLE STARLINK", "temprana": true, "tipo_error": "Internet", "resumen": "Cable internet falla.", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Auchac", "fecha": "2026-06-04", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "", "modelo": "4.5.1", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Auchac", "fecha": "2026-06-16", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5.1", "dias_desde_anterior": 12, "plazo_esperado": 90, "problema": "3. Raspberry Pi (Control)", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla raspi", "mismo_tecnico": false}, {"empresa": "Invermar", "centro": "Auchac", "fecha": "2026-06-26", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5.1", "dias_desde_anterior": 10, "plazo_esperado": 90, "problema": "No carga agua, problemas de conexión en pasamuros", "temprana": true, "tipo_error": "Factor humano", "resumen": "Conexiones malas", "mismo_tecnico": false}, {"empresa": "Invermar", "centro": "Auchac", "fecha": "2026-07-28", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5.1", "dias_desde_anterior": 32, "plazo_esperado": 90, "problema": "No carga agua, FALLA EN VALVULA C", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla valvula", "mismo_tecnico": false}, {"empresa": "Invermar", "centro": "Chulin", "fecha": "2026-01-21", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 29, "plazo_esperado": 60, "problema": "Manguera de 1 metro mas corta ", "temprana": true, "tipo_error": "Factor humano", "resumen": "Manguera corta", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Chulin", "fecha": "2026-02-18", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 28, "plazo_esperado": 60, "problema": "Bomba descebada (sin agua)", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla bomba externa", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Chulin", "fecha": "2026-04-09", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 50, "plazo_esperado": 60, "problema": "1. Placa (Carrier), Falta de grasa, Mangueras tapadas", "temprana": true, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Chulin", "fecha": "2026-05-19", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 40, "plazo_esperado": 90, "problema": "", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Se cambia a v4.5", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Chulin", "fecha": "2026-07-24", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 66, "plazo_esperado": 90, "problema": "INTERNET DEFICIENTE ( BAM)", "temprana": true, "tipo_error": "Internet", "resumen": "Se cambia a starlink", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Ester", "fecha": "2026-02-07", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 91, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Ester", "fecha": "2026-05-16", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 98, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Ester", "fecha": "2026-07-24", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 69, "plazo_esperado": 60, "problema": "Motor fuera de su eje", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Mapue", "fecha": "2026-03-06", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Mapue", "fecha": "2026-06-17", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 103, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Nayahue", "fecha": "2026-04-09", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Nayahue", "fecha": "2026-07-20", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 102, "plazo_esperado": 90, "problema": "3. Raspberry Pi (Control)", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Tahuenahuec", "fecha": "2026-04-15", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Tepun", "fecha": "2026-03-04", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Tepun", "fecha": "2026-05-05", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 62, "plazo_esperado": 90, "problema": "Barredor atascado, Rotura de cristal en placa, Buffer vacío (carga aire a la placa), No carga agua, Bomba descebada (sin agua)", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Mangueras tapadas", "mismo_tecnico": false}, {"empresa": "Invermar", "centro": "Tepun", "fecha": "2026-06-22", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 48, "plazo_esperado": 90, "problema": "Buffer vacío (carga aire a la placa), Cambio de posición. A menor altura", "temprana": true, "tipo_error": "Factor humano", "resumen": "Conectores con filtración", "mismo_tecnico": false}, {"empresa": "Invermar", "centro": "Traiguen 1", "fecha": "2026-01-13", "tipo": "Mantención correctiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 77, "plazo_esperado": 90, "problema": "1. Placa (Carrier), red bloqueada desde puerto de switch fortinet", "temprana": true, "tipo_error": "Internet", "resumen": "Puerto bloqueado", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Traiguen 1", "fecha": "2026-04-14", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 91, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Traiguen 1", "fecha": "2026-05-04", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 20, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Traiguen 1", "fecha": "2026-06-03", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 30, "plazo_esperado": 90, "problema": "1. Placa (Carrier), Buffer vacío (carga aire a la placa), No carga agua, Bomba descebada (sin agua), MANGUERAS DAÑADAS", "temprana": true, "tipo_error": "Factor humano", "resumen": "Placa con filtración y barredor trabado", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Traiguen 1", "fecha": "2026-06-26", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 23, "plazo_esperado": 90, "problema": "No carga agua, SENSOR DE FLUJO CON POSIBLE FILTRACION", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Valvula de paso con filtración", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Traiguen 1", "fecha": "2026-08-21", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 56, "plazo_esperado": 90, "problema": "No carga agua, Bomba descebada (sin agua), Mangueras tapadas, MANGUERAS ROTAS", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Mangueras cortadas", "mismo_tecnico": true}, {"empresa": "Invermar", "centro": "Traiguen 2", "fecha": "2026-01-13", "tipo": "Mantención correctiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 77, "plazo_esperado": 60, "problema": "No carga agua", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Traiguen 2", "fecha": "2026-03-26", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 72, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Traiguen 2", "fecha": "2026-04-24", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 29, "plazo_esperado": 60, "problema": "1. Placa (Carrier), Bomba descebada (sin agua), Mangueras tapadas", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Mangueras tapadas", "mismo_tecnico": false}, {"empresa": "Invermar", "centro": "Traiguen 2", "fecha": "2026-05-04", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4", "dias_desde_anterior": 10, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Traiguen 2", "fecha": "2026-05-06", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4", "dias_desde_anterior": 2, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Traiguen 2", "fecha": "2026-08-11", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4", "dias_desde_anterior": 97, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Traiguen 2", "fecha": "2026-09-04", "tipo": "Desinstalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "", "dias_desde_anterior": 24, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Walker 2", "fecha": "2026-01-05", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 92, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Invermar", "centro": "Yatac", "fecha": "2026-08-05", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Benjamin", "fecha": "2026-02-13", "tipo": "Instalación", "tecnico": "Daniel Muñoz", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Benjamin", "fecha": "2026-03-05", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 20, "plazo_esperado": 90, "problema": "", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla raspi", "mismo_tecnico": false}, {"empresa": "Mowi", "centro": "Benjamin", "fecha": "2026-07-03", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 120, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Bobe", "fecha": "2026-01-29", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 69, "plazo_esperado": 90, "problema": "Barredor atascado", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Barredor atascado", "mismo_tecnico": false}, {"empresa": "Mowi", "centro": "Huelmo", "fecha": "2026-01-16", "tipo": "Mantención preventiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 36, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Huelmo", "fecha": "2026-02-03", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 18, "plazo_esperado": 60, "problema": "Barredor atascado", "temprana": true, "tipo_error": "Factor humano", "resumen": "Barredor roto", "mismo_tecnico": false}, {"empresa": "Mowi", "centro": "Huelmo", "fecha": "2026-03-24", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 49, "plazo_esperado": 60, "problema": "Problema Electrico (posible corto circuito)", "temprana": true, "tipo_error": "Factor centro", "resumen": "Corto circuito centro", "mismo_tecnico": false}, {"empresa": "Mowi", "centro": "Huelmo", "fecha": "2026-04-24", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 31, "plazo_esperado": 60, "problema": "Enchufe eléctrico suelto ", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Se cambia UPS", "mismo_tecnico": true}, {"empresa": "Mowi", "centro": "Huelmo", "fecha": "2026-06-12", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 49, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Huelmo", "fecha": "2026-08-06", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 55, "plazo_esperado": 60, "problema": "mangueras enredadas y cabo cortado", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Manguera cortada y cabo suelto", "mismo_tecnico": true}, {"empresa": "Mowi", "centro": "Linao", "fecha": "2026-03-25", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 91, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Linao", "fecha": "2026-04-29", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 35, "plazo_esperado": 60, "problema": "1. Placa (Carrier), Barredor atascado, Mangueras tapadas, Filtro de aire en electroválvulas (por falta de o-ring)", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Linao", "fecha": "2026-07-10", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4", "dias_desde_anterior": 72, "plazo_esperado": 60, "problema": "Mangueras tapadas, Filtro de aire en electroválvulas (por falta de o-ring), PLACA COLONIZADA", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Rada Achao", "fecha": "2026-01-06", "tipo": "Mantención correctiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 53, "plazo_esperado": 90, "problema": "Barredor atascado, Eje X con juego en carro ", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Eje X suelto", "mismo_tecnico": true}, {"empresa": "Mowi", "centro": "Rada Achao", "fecha": "2026-01-30", "tipo": "Instalación", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 24, "plazo_esperado": 90, "problema": "Sams v4.5", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Se cambia a v4.5", "mismo_tecnico": true}, {"empresa": "Mowi", "centro": "Rada Achao", "fecha": "2026-03-26", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 55, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Mowi", "centro": "Rada Achao", "fecha": "2026-08-12", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 139, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Austral", "centro": "Bajos Lami", "fecha": "2026-08-14", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Austral", "centro": "Pirquen", "fecha": "2026-02-12", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 86, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Austral", "centro": "Pirquen", "fecha": "2026-03-17", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 33, "plazo_esperado": 90, "problema": "No carga agua, 3. Raspberry Pi (Control), Electrovalvulas tapadas con algas ", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla raspi", "mismo_tecnico": true}, {"empresa": "Salmones Austral", "centro": "Pirquen", "fecha": "2026-04-01", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 15, "plazo_esperado": 90, "problema": "No carga agua, Manguera 4mm tapada, cambio de placa", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Manguera tapada", "mismo_tecnico": false}, {"empresa": "Salmones Austral", "centro": "Pirquen", "fecha": "2026-04-15", "tipo": "Mantención correctiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 14, "plazo_esperado": 90, "problema": "Buffer vacío (carga aire a la placa), No carga agua, Bomba descebada (sin agua), Mangueras tapadas", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Maguera tapada", "mismo_tecnico": false}, {"empresa": "Salmones Austral", "centro": "Pirquen", "fecha": "2026-07-29", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 105, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Austral", "centro": "Pirquen", "fecha": "2026-08-10", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 12, "plazo_esperado": 90, "problema": "Valvula paso nivel 1 pegada abierta no cerraba", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Falla valvula", "mismo_tecnico": false}, {"empresa": "Salmones Austral", "centro": "Pocoihuen", "fecha": "2026-01-28", "tipo": "Instalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Austral", "centro": "Pocoihuen", "fecha": "2026-02-03", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 6, "plazo_esperado": 90, "problema": "", "temprana": true, "tipo_error": "Internet", "resumen": "Falla starlink", "mismo_tecnico": true}, {"empresa": "Salmones Austral", "centro": "Pocoihuen", "fecha": "2026-02-04", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 1, "plazo_esperado": 90, "problema": "Sin conectividad, módem Starlink averiado ", "temprana": true, "tipo_error": "Internet", "resumen": "Se cambia a BAM", "mismo_tecnico": false}, {"empresa": "Salmones Austral", "centro": "Pocoihuen", "fecha": "2026-05-20", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 105, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Austral", "centro": "Pocoihuen", "fecha": "2026-08-12", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 84, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Austral", "centro": "Pocoihuen", "fecha": "2026-08-20", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 8, "plazo_esperado": 90, "problema": "Desconexión internet", "temprana": true, "tipo_error": "Internet", "resumen": "Se cambia a starlink", "mismo_tecnico": false}, {"empresa": "Salmones Aysen", "centro": "Chulchuy", "fecha": "2026-08-20", "tipo": "Instalación", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "", "modelo": "4.5", "dias_desde_anterior": null, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Perhue", "fecha": "2026-01-06", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 13, "plazo_esperado": 60, "problema": "Eje mal pegado", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Soporte 3D torcido", "mismo_tecnico": false}, {"empresa": "Salmones Aysen", "centro": "Perhue", "fecha": "2026-01-21", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 15, "plazo_esperado": 60, "problema": "1. Placa (Carrier), Barredor atascado, Manguera suelta/flotando", "temprana": true, "tipo_error": "Factor humano", "resumen": "Barredor atascado", "mismo_tecnico": true}, {"empresa": "Salmones Aysen", "centro": "Perhue", "fecha": "2026-01-29", "tipo": "Instalación", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 8, "plazo_esperado": 90, "problema": "Sistema samsv 4.5 completo ", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Se cambia a v4.5", "mismo_tecnico": false}, {"empresa": "Salmones Aysen", "centro": "Perhue", "fecha": "2026-02-13", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4.5", "dias_desde_anterior": 15, "plazo_esperado": 90, "problema": "Bomba descebada (sin agua), Mangueras tapadas", "temprana": true, "tipo_error": "Factor humano", "resumen": "Mangueras cortas", "mismo_tecnico": false}, {"empresa": "Salmones Aysen", "centro": "Perhue", "fecha": "2026-03-17", "tipo": "Mantención correctiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4.5", "dias_desde_anterior": 32, "plazo_esperado": 90, "problema": "No carga agua, Bomba descebada (sin agua), Mangueras sueltas, sin peso. Filtración en la válvula de paso", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Cabo suelto", "mismo_tecnico": false}, {"empresa": "Salmones Aysen", "centro": "Perhue", "fecha": "2026-07-09", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 114, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Perhue", "fecha": "2026-08-18", "tipo": "Mantención preventiva", "tecnico": "Wilmer Ruiz", "tecnico_anterior": "Wilmer Ruiz", "modelo": "4.5", "dias_desde_anterior": 40, "plazo_esperado": 90, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Puelche", "fecha": "2026-02-24", "tipo": "Mantención preventiva", "tecnico": "Daniel Muñoz", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 82, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Puelche", "fecha": "2026-05-29", "tipo": "Mantención preventiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz", "modelo": "4", "dias_desde_anterior": 94, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Puelche", "fecha": "2026-08-18", "tipo": "Desinstalación", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Adrián Calcumil", "modelo": "", "dias_desde_anterior": 81, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Punta Redonda", "fecha": "2026-02-16", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Daniel Muñoz, Ángelo Guzmán", "modelo": "4", "dias_desde_anterior": 83, "plazo_esperado": 60, "problema": "1. Placa (Carrier)", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Punta Redonda", "fecha": "2026-03-31", "tipo": "Mantención preventiva", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Adrián Calcumil", "modelo": "4", "dias_desde_anterior": 43, "plazo_esperado": 60, "problema": "", "temprana": false, "tipo_error": "", "resumen": "", "mismo_tecnico": null}, {"empresa": "Salmones Aysen", "centro": "Punta Redonda", "fecha": "2026-05-19", "tipo": "Instalación", "tecnico": "Ángelo Guzmán", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 49, "plazo_esperado": 90, "problema": "", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Se cambia a v4.5", "mismo_tecnico": true}, {"empresa": "Salmones Aysen", "centro": "Punta Redonda", "fecha": "2026-07-29", "tipo": "Mantención correctiva", "tecnico": "Adrián Calcumil", "tecnico_anterior": "Ángelo Guzmán", "modelo": "4.5", "dias_desde_anterior": 71, "plazo_esperado": 90, "problema": "Mangueras desconectadas ", "temprana": true, "tipo_error": "Factor equipo", "resumen": "Mangueras sueltas", "mismo_tecnico": false}];
+
+const TIPO_CLASS = {
+  'Instalación':'tipo-instalacion',
+  'Mantención preventiva':'tipo-preventiva',
+  'Mantención correctiva':'tipo-correctiva',
+  'Desinstalación':'tipo-desinstalacion',
+  'Mantención / Instalación Pendiente':'tipo-pendiente'
+};
+function tipoClass(t){ return TIPO_CLASS[t] || 'tipo-otro'; }
+
+const LEGEND_ITEMS = [
+  ['Instalación','tipo-instalacion'],
+  ['Mantención preventiva','tipo-preventiva'],
+  ['Mantención correctiva','tipo-correctiva'],
+  ['Desinstalación','tipo-desinstalacion'],
+];
+
+function fmtDate(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${parseInt(d)} ${meses[parseInt(m)-1]} ${y}`;
+}
+
+// ---------- KPIs ----------
+function updateKpis(filteredData){
+  const total = filteredData.length;
+  const tempranas = filteredData.filter(d=>d.temprana);
+  const centrosAfectados = new Set(tempranas.map(d=>d.centro)).size;
+  const centrosTotal = new Set(filteredData.map(d=>d.centro)).size;
+  const pct = total ? ((tempranas.length/total)*100).toFixed(1) : '0';
+  const kpiDefs = [
+    {num: total, label:'Visitas a terreno registradas', cls:''},
+    {num: tempranas.length, label:'Visitas antes del plazo esperado', cls:'alert'},
+    {num: pct+'%', label:'del total de visitas', cls:'alert'},
+    {num: `${centrosAfectados} / ${centrosTotal}`, label:'centros con al menos una visita temprana', cls:''},
+  ];
+  const kpisEl = document.getElementById('kpis');
+  kpisEl.innerHTML = '';
+  kpiDefs.forEach(k=>{
+    const el = document.createElement('div');
+    el.className = 'kpi ' + k.cls;
+    el.innerHTML = `<div class="num">${k.num}</div><div class="label">${k.label}</div>`;
+    kpisEl.appendChild(el);
+  });
+}
+
+// ---------- Legend ----------
+const legendEl = document.getElementById('legend');
+LEGEND_ITEMS.forEach(([label, cls])=>{
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  item.innerHTML = `<span class="dot-sample ${cls}"></span>${label}`;
+  legendEl.appendChild(item);
+});
+const ringItem = document.createElement('div');
+ringItem.className = 'legend-item';
+ringItem.innerHTML = `<span class="ring-sample"></span>Antes del plazo esperado`;
+legendEl.appendChild(ringItem);
+
+// ---------- Filters ----------
+const empresas = Array.from(new Set(DATA.map(d=>d.empresa))).sort();
+const empresaSelect = document.getElementById('empresaFilter');
+empresaSelect.innerHTML = '<option value="__ALL__">Todas las empresas</option>' +
+  empresas.map(e=>`<option value="${e}">${e}</option>`).join('');
+
+const errorTypes = Array.from(new Set(DATA.map(d=>d.tipo_error).filter(Boolean))).sort();
+const errorSelect = document.getElementById('errorFilter');
+errorSelect.innerHTML = '<option value="__ALL__">Todos</option>' +
+  errorTypes.map(e=>`<option value="${e}">${e}</option>`).join('');
+
+const onlyFlagged = document.getElementById('onlyFlagged');
+
+empresaSelect.addEventListener('change', render);
+errorSelect.addEventListener('change', render);
+onlyFlagged.addEventListener('change', render);
+
+// ---------- Timeline geometry (fixed to full data range) ----------
+const allDates = DATA.filter(d=>d.fecha).map(d=>new Date(d.fecha));
+const minDateFull = new Date(Math.min(...allDates));
+const maxDateFull = new Date(Math.max(...allDates));
+
+document.getElementById('headerSub').textContent =
+  `Visitas registradas desde ${fmtDate(minDateFull.toISOString().slice(0,10))} hasta ${fmtDate(maxDateFull.toISOString().slice(0,10))}. Cada punto es una visita a terreno; los puntos con anillo rojo llegaron antes del plazo esperado de mantención (60 días v4 / 90 días v4.5).`;
+
+function getRange(){
+  return [minDateFull, maxDateFull];
+}
+
+// ---------- Tooltip ----------
+const tooltip = document.getElementById('tooltip');
+function showTooltip(evt, visit){
+  let html = `<div class="tt-title">${visit.centro} — ${visit.tipo}</div>`;
+
+  const esCorrectiva = visit.tipo === 'Mantención correctiva';
+
+  // Tipo de error + resumen van primero, bien arriba
+  if(esCorrectiva && visit.tipo_error){
+    html += `<div class="tt-error-tag">${visit.tipo_error}</div>`;
+    if(visit.resumen) html += `<div class="tt-row tt-resumen">${visit.resumen}</div>`;
+  }
+
+  html += `<div class="tt-row">${fmtDate(visit.fecha)}${visit.tecnico ? ' · '+visit.tecnico : ''}</div>`;
+  if(visit.modelo) html += `<div class="tt-row">Modelo v${visit.modelo}</div>`;
+  if(visit.problema) html += `<div class="tt-row">${visit.problema}</div>`;
+  if(visit.dias_desde_anterior !== null){
+    html += `<div class="tt-row">${visit.dias_desde_anterior} días desde la visita anterior (esperado: ${visit.plazo_esperado})</div>`;
+  }
+
+  if(esCorrectiva && visit.tecnico_anterior){
+    html += `<div class="tt-chain">`;
+    html += `<div class="tt-row">${visit.tecnico_anterior} → ${visit.tecnico}</div>`;
+    if(visit.mismo_tecnico !== null){
+      const cls = visit.mismo_tecnico ? 'same' : 'diff';
+      const txt = visit.mismo_tecnico ? 'mismo técnico' : 'técnico distinto';
+      html += `<span class="tt-badge ${cls}">${txt}</span>`;
+    }
+    if(visit.temprana) html += `<span class="tt-flag">⚠ Volvimos antes del plazo esperado</span>`;
+    html += `</div>`;
+  } else if(visit.temprana){
+    html += `<div class="tt-chain">`;
+    html += `<span class="tt-flag">⚠ Volvimos antes del plazo esperado</span>`;
+    if(visit.tecnico_anterior) html += `<div class="tt-row">${visit.tecnico_anterior} → ${visit.tecnico}</div>`;
+    html += `</div>`;
+  }
+  tooltip.innerHTML = html;
+  tooltip.classList.add('show');
+  moveTooltip(evt);
+}
+function moveTooltip(evt){
+  const pad = 14;
+  let x = evt.clientX + pad;
+  let y = evt.clientY + pad;
+  if(x + 300 > window.innerWidth) x = evt.clientX - 300 - pad;
+  if(y + 160 > window.innerHeight) y = evt.clientY - 160 - pad;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+function hideTooltip(){ tooltip.classList.remove('show'); }
+
+// ---------- Render ----------
+const mainEl = document.getElementById('main');
+
+function render(){
+  mainEl.innerHTML = '';
+  const empSel = empresaSelect.value;
+  const errSel = errorSelect.value;
+  const onlyFlaggedVal = onlyFlagged.checked;
+
+  let filtered = DATA;
+  if(empSel !== '__ALL__') filtered = filtered.filter(d=>d.empresa===empSel);
+
+  updateKpis(filtered);
+
+  if(errSel !== '__ALL__'){
+    const centrosConError = new Set(filtered.filter(d=>d.tipo_error===errSel).map(d=>d.centro));
+    filtered = filtered.filter(d=>centrosConError.has(d.centro));
+  }
+
+  const [rangeStart0, rangeEnd0] = getRange();
+  const PAD_DAYS = 10;
+  const rangeStart = new Date(rangeStart0); rangeStart.setDate(rangeStart.getDate()-PAD_DAYS);
+  const rangeEnd = new Date(rangeEnd0); rangeEnd.setDate(rangeEnd.getDate()+PAD_DAYS);
+  const totalDays = (rangeEnd - rangeStart) / 86400000;
+  const PX_PER_DAY = 5.2;
+  const trackWidth = totalDays * PX_PER_DAY;
+
+  function xPos(iso){
+    const d = new Date(iso);
+    const days = (d - rangeStart) / 86400000;
+    return days * PX_PER_DAY;
+  }
+  function monthTicks(){
+    const ticks = [];
+    let cur = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+    const mesesCortos = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    while(cur <= rangeEnd){
+      const days = (cur - rangeStart) / 86400000;
+      ticks.push({ x: days*PX_PER_DAY, label: `${mesesCortos[cur.getMonth()]} ${cur.getFullYear().toString().slice(2)}` });
+      cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+    }
+    return ticks;
+  }
+
+  // group by empresa -> centro
+  const byEmpresa = {};
+  filtered.forEach(d=>{
+    if(!byEmpresa[d.empresa]) byEmpresa[d.empresa] = {};
+    if(!byEmpresa[d.empresa][d.centro]) byEmpresa[d.empresa][d.centro] = [];
+    byEmpresa[d.empresa][d.centro].push(d);
+  });
+
+  const empresaOrder = Object.keys(byEmpresa).sort();
+  let anyCenters = false;
+
+  empresaOrder.forEach(emp=>{
+    let centros = Object.keys(byEmpresa[emp]).sort();
+    if(onlyFlaggedVal){
+      centros = centros.filter(c=>byEmpresa[emp][c].some(v=>v.temprana));
+    }
+    if(errSel !== '__ALL__'){
+      centros = centros.filter(c=>byEmpresa[emp][c].some(v=>v.tipo_error===errSel));
+    }
+    if(centros.length === 0) return;
+    anyCenters = true;
+
+    const group = document.createElement('div');
+    group.className = 'company-group';
+
+    const header = document.createElement('div');
+    header.className = 'company-header';
+    header.innerHTML = `${emp} <span class="count">${centros.length} centro${centros.length>1?'s':''}</span>`;
+    group.appendChild(header);
+
+    const scrollOuter = document.createElement('div');
+    scrollOuter.className = 'scroll-outer';
+
+    const grid = document.createElement('div');
+    grid.className = 'timeline-grid';
+    grid.style.gridTemplateRows = `26px repeat(${centros.length}, 38px)`;
+
+    const axisSpacer = document.createElement('div');
+    axisSpacer.className = 'axis-label-spacer';
+    grid.appendChild(axisSpacer);
+
+    const axisTrack = document.createElement('div');
+    axisTrack.className = 'axis-track';
+    axisTrack.style.width = trackWidth + 'px';
+    monthTicks().forEach(t=>{
+      const tick = document.createElement('div');
+      tick.className = 'month-tick';
+      tick.style.left = t.x + 'px';
+      tick.textContent = t.label;
+      axisTrack.appendChild(tick);
+    });
+    grid.appendChild(axisTrack);
+
+    centros.forEach(centro=>{
+      let visits = byEmpresa[emp][centro].slice().sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
+      const hasFlag = visits.some(v=>v.temprana);
+
+      const label = document.createElement('div');
+      label.className = 'center-label';
+      label.innerHTML = `${hasFlag ? '<span class="flag">●</span>' : ''}${centro}`;
+      grid.appendChild(label);
+
+      const track = document.createElement('div');
+      track.className = 'center-track';
+      track.style.width = trackWidth + 'px';
+      const baseline = document.createElement('div');
+      baseline.className = 'baseline';
+      track.appendChild(baseline);
+
+      monthTicks().forEach(t=>{
+        const gl = document.createElement('div');
+        gl.className = 'grid-line';
+        gl.style.left = t.x + 'px';
+        track.appendChild(gl);
+      });
+
+      visits.forEach(v=>{
+        if(!v.fecha) return;
+        let cls = 'visit-dot ' + tipoClass(v.tipo);
+        if(v.temprana){
+          cls += ' temprana';
+          if(v.mismo_tecnico === false) cls += ' otro-tecnico';
+        }
+        const dot = document.createElement('div');
+        dot.className = cls;
+        dot.style.left = xPos(v.fecha) + 'px';
+        dot.addEventListener('mousemove', (e)=>{ showTooltip(e, v); moveTooltip(e); });
+        dot.addEventListener('mouseenter', (e)=>showTooltip(e, v));
+        dot.addEventListener('mouseleave', hideTooltip);
+        track.appendChild(dot);
+      });
+
+      grid.appendChild(track);
+    });
+
+    scrollOuter.appendChild(grid);
+    group.appendChild(scrollOuter);
+    mainEl.appendChild(group);
+  });
+
+  if(!anyCenters){
+    mainEl.innerHTML = '<div style="padding:40px; color:var(--slate); font-size:14px;">No hay centros que cumplan este filtro.</div>';
+  }
+}
+
+render();
+</script>
+
+</body>
+</html>
