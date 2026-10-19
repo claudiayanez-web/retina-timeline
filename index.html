@@ -71,6 +71,21 @@
   }
   .tab-btn:hover{ color:var(--ink); }
   .tab-btn.active{ color:var(--ink); border-bottom-color:var(--coral); }
+  .mes-block{ display:flex; align-items:center; gap:10px; flex-basis:100%; flex-wrap:wrap; }
+  .mes-block label{ margin-right:0; }
+  .chips{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .chip{
+    font-family:inherit; font-size:13px; font-weight:600; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:999px;
+    padding:5px 12px; cursor:pointer; transition:background .12s ease, border-color .12s ease;
+  }
+  .chip:hover{ border-color:var(--ink); }
+  .chip:focus-visible{ outline:2px solid var(--teal); outline-offset:2px; }
+  .chip.active{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .chip-year{
+    font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--slate);
+    margin:0 2px 0 10px; text-transform:uppercase;
+  }
   .err-row{
     display:flex;
     align-items:center;
@@ -432,16 +447,16 @@
         <select id="errCatFilter"></select>
       </div>
       <div>
-        <label for="errMesFilter">Mes</label>
-        <select id="errMesFilter"></select>
-      </div>
-      <div>
         <label for="errVersionFilter">Versión</label>
         <select id="errVersionFilter">
           <option value="__ALL__">Todas</option>
           <option value="4">v4</option>
           <option value="4.5">v4.5</option>
         </select>
+      </div>
+      <div class="mes-block">
+        <label>Mes</label>
+        <div id="errMesChips" class="chips"></div>
       </div>
     </div>
     <div id="errorRankingList"></div>
@@ -899,34 +914,59 @@ const errCatOptions = Array.from(new Set(DATA.map(d=>d.tipo_error).filter(Boolea
 errCatFilter.innerHTML = '<option value="__ALL__">Todos</option>' +
   errCatOptions.map(e=>`<option value="${e}">${e}</option>`).join('');
 
-const errMesFilter = document.getElementById('errMesFilter');
+const errMesChips = document.getElementById('errMesChips');
+let errMesSel = '__ALL__';
 const errVersionFilter = document.getElementById('errVersionFilter');
 
 const MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-// Meses disponibles según el año elegido arriba (mantiene la selección si sigue existiendo)
+const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// Botones de mes según el año elegido arriba (si el mes elegido no existe en ese año, vuelve a "Todos")
 function refreshErrMonthOptions(){
-  const previo = errMesFilter.value || '__ALL__';
   const meses = Array.from(new Set(dataByYear().filter(d=>d.fecha).map(d=>d.fecha.slice(0,7)))).sort();
-  errMesFilter.innerHTML = '<option value="__ALL__">Todos los meses</option>' +
-    meses.map(m=>{
-      const [y, mm] = m.split('-');
-      return `<option value="${m}">${MESES_LARGO[+mm - 1]} ${y}</option>`;
-    }).join('');
-  errMesFilter.value = meses.includes(previo) ? previo : '__ALL__';
+  if(errMesSel !== '__ALL__' && !meses.includes(errMesSel)) errMesSel = '__ALL__';
+  errMesChips.innerHTML = '';
+  const addChip = (valor, texto, titulo)=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (valor === errMesSel ? ' active' : '');
+    b.textContent = texto;
+    b.dataset.mes = valor;
+    if(titulo) b.title = titulo;
+    b.setAttribute('aria-pressed', valor === errMesSel ? 'true' : 'false');
+    b.addEventListener('click', ()=>{
+      errMesSel = valor;
+      refreshErrMonthOptions();
+      renderErrorRanking();
+    });
+    errMesChips.appendChild(b);
+  };
+  addChip('__ALL__', 'Todos', 'Todos los meses');
+  let anioActual = null;
+  meses.forEach(m=>{
+    const [y, mm] = m.split('-');
+    if(y !== anioActual){
+      const s = document.createElement('span');
+      s.className = 'chip-year';
+      s.textContent = y;
+      errMesChips.appendChild(s);
+      anioActual = y;
+    }
+    addChip(m, MESES_CORTO[+mm - 1], `${MESES_LARGO[+mm - 1]} ${y}`);
+  });
 }
 refreshErrMonthOptions();
 
 errTecFilter.addEventListener('change', renderErrorRanking);
 errCatFilter.addEventListener('change', renderErrorRanking);
-errMesFilter.addEventListener('change', renderErrorRanking);
 errVersionFilter.addEventListener('change', renderErrorRanking);
 
 function renderErrorRanking(){
   const yearData = dataByYear();
   const tecSel = errTecFilter.value;
   const catSel = errCatFilter.value;
-  const mesSel = errMesFilter.value;
+  const mesSel = errMesSel;
   const versionSel = errVersionFilter.value;
 
   let rows = yearData.filter(d=>d.tipo === 'Mantención correctiva' && d.resumen);
