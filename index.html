@@ -88,13 +88,13 @@
   .fc-inner{ position:absolute; left:34px; right:0; top:24px; bottom:0; border-bottom:1px solid var(--slate-light); }
   .fc-grid{ position:absolute; left:0; right:0; border-top:1px dashed var(--line); }
   .fc-grid span{ position:absolute; left:-34px; width:28px; text-align:right; font-size:11px; color:var(--slate-light); transform:translateY(-50%); }
-  .fc-cols{ position:relative; display:flex; gap:12px; height:100%; padding:0 6px; }
-  .fc-col{ flex:1; display:flex; flex-direction:column-reverse; height:100%; }
+  .fc-cols{ position:relative; display:flex; justify-content:center; gap:12px; height:100%; padding:0 6px; }
+  .fc-col{ flex:1; max-width:120px; display:flex; flex-direction:column-reverse; height:100%; }
   .fc-seg{ flex:none; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; cursor:default; }
   .fc-seg:hover{ filter:brightness(1.12); }
   .fc-total{ flex:none; text-align:center; font-size:12px; font-weight:700; color:var(--ink); padding-bottom:3px; }
-  .fc-months{ display:flex; gap:12px; padding:6px 6px 0 40px; }
-  .fc-months div{ flex:1; text-align:center; font-size:12px; color:var(--slate); }
+  .fc-months{ display:flex; justify-content:center; gap:12px; padding:6px 6px 0 40px; }
+  .fc-months div{ flex:1; max-width:120px; text-align:center; font-size:12px; color:var(--slate); }
   .err-row .err-label{
     width:280px;
     flex:none;
@@ -469,6 +469,24 @@
   <section style="padding:26px 40px 40px;">
     <h2 style="font-size:15px; font-weight:700; margin:0 0 4px;">Errores por factor — últimos 12 meses</h2>
     <p id="factorSub" style="font-size:13px; color:var(--slate); margin:0 0 14px;"></p>
+    <div class="controls" style="padding:0 0 18px;">
+      <div>
+        <label for="facTecFilter">Técnico</label>
+        <select id="facTecFilter"></select>
+      </div>
+      <div>
+        <label for="facMesFilter">Mes</label>
+        <select id="facMesFilter"></select>
+      </div>
+      <div>
+        <label for="facVersionFilter">Versión</label>
+        <select id="facVersionFilter">
+          <option value="__ALL__">Todas</option>
+          <option value="4">v4</option>
+          <option value="4.5">v4.5</option>
+        </select>
+      </div>
+    </div>
     <div id="factorLegend" class="factor-legend"></div>
     <div id="factorChart" class="factor-chart"></div>
   </section>
@@ -1047,18 +1065,55 @@ function ultimos12Meses(){
   return out;
 }
 
+// Filtros de esta pestaña (técnico = quien hizo la visita anterior, igual que en "Errores más comunes")
+const facTecFilter = document.getElementById('facTecFilter');
+const facMesFilter = document.getElementById('facMesFilter');
+const facVersionFilter = document.getElementById('facVersionFilter');
+
+facTecFilter.innerHTML = '<option value="__ALL__">Todos los técnicos</option>' +
+  errTecOptions.map(t=>`<option value="${t}">${t}</option>`).join('');
+
+// Meses de la ventana de 12 meses: el más reciente primero, separados por año
+(function(){
+  const ms = ultimos12Meses().slice().reverse();
+  const porAnio = {};
+  ms.forEach(m=>{ const y = m.slice(0, 4); (porAnio[y] = porAnio[y] || []).push(m); });
+  let html = '<option value="__ALL__">Todos los meses</option>';
+  Object.keys(porAnio).sort().reverse().forEach(y=>{
+    html += `<optgroup label="${y}">` +
+      porAnio[y].map(m=>`<option value="${m}">${MESES_LARGO[+m.slice(5, 7) - 1]}</option>`).join('') +
+      '</optgroup>';
+  });
+  facMesFilter.innerHTML = html;
+})();
+
+[facTecFilter, facMesFilter, facVersionFilter].forEach(el=> el.addEventListener('change', renderFactorChart));
+
 function renderFactorChart(){
-  const meses = ultimos12Meses();
-  const enVentana = DATA.filter(d=>d.tipo === 'Mantención correctiva' && d.fecha && meses.includes(d.fecha.slice(0, 7)));
-  const rows = enVentana.filter(d=>d.tipo_error);
-  const sinClasificar = enVentana.length - rows.length;
+  const tecSel = facTecFilter.value;
+  const mesSel = facMesFilter.value;
+  const versionSel = facVersionFilter.value;
+
+  const meses = mesSel === '__ALL__' ? ultimos12Meses() : [mesSel];
+  let base = DATA.filter(d=>d.tipo === 'Mantención correctiva' && d.fecha && meses.includes(d.fecha.slice(0, 7)));
+  if(tecSel !== '__ALL__') base = base.filter(d=>tecnicoList(d.tecnico_anterior).includes(tecSel));
+  if(versionSel !== '__ALL__'){
+    base = base.filter(d=> d.modelo && (versionSel === '4' ? d.modelo === '4' : d.modelo.startsWith('4.5')));
+  }
+  const rows = base.filter(d=>d.tipo_error);
+  const sinClasificar = base.length - rows.length;
 
   const porMes = {};
   meses.forEach(m=>{ porMes[m] = {}; FACTORES.forEach(f=>{ porMes[m][f.nombre] = []; }); });
   rows.forEach(d=>{ if(porMes[d.fecha.slice(0, 7)][d.tipo_error]) porMes[d.fecha.slice(0, 7)][d.tipo_error].push(d); });
 
+  const periodo = meses.length === 1
+    ? `de ${etiquetaMesFactor(meses[0])}`
+    : `de ${etiquetaMesFactor(meses[0])} a ${etiquetaMesFactor(meses[meses.length - 1])} (el último mes puede estar incompleto)`;
   document.getElementById('factorSub').textContent =
-    `Correctivas con tipo de error, de ${etiquetaMesFactor(meses[0])} a ${etiquetaMesFactor(meses[11])} (el último mes puede estar incompleto). No depende del filtro de año. Total: ${rows.length}.` +
+    `Correctivas con tipo de error ${periodo}. No depende del filtro de año.` +
+    (tecSel !== '__ALL__' ? ' Con técnico: correctivas que llegaron después de una visita suya.' : '') +
+    ` Total: ${rows.length}.` +
     (sinClasificar ? ` ${sinClasificar} sin tipo de error no se incluyen.` : '');
 
   // Leyenda con totales
@@ -1071,7 +1126,7 @@ function renderFactorChart(){
 
   const chart = document.getElementById('factorChart');
   if(rows.length === 0){
-    chart.innerHTML = '<div style="padding:20px 0; color:var(--slate); font-size:14px;">No hay datos en estos 12 meses.</div>';
+    chart.innerHTML = '<div style="padding:20px 0; color:var(--slate); font-size:14px;">No hay datos para este filtro.</div>';
     return;
   }
 
