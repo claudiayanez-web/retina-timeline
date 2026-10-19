@@ -78,6 +78,7 @@
     padding:8px 0;
     border-bottom:1px solid var(--line);
   }
+  .err-row:hover{ background:#EFEEEA; }
   .err-row .err-label{
     width:280px;
     flex:none;
@@ -687,10 +688,13 @@ function showTooltip(evt, visit){
 }
 function moveTooltip(evt){
   const pad = 14;
+  const r = tooltip.getBoundingClientRect();
+  const tw = r.width || 300;
+  const th = r.height || 160;
   let x = evt.clientX + pad;
   let y = evt.clientY + pad;
-  if(x + 300 > window.innerWidth) x = evt.clientX - 300 - pad;
-  if(y + 160 > window.innerHeight) y = evt.clientY - 160 - pad;
+  if(x + tw > window.innerWidth) x = evt.clientX - tw - pad;
+  if(y + th > window.innerHeight) y = Math.max(8, evt.clientY - th - pad);
   tooltip.style.left = x + 'px';
   tooltip.style.top = y + 'px';
 }
@@ -953,7 +957,11 @@ function renderErrorRanking(){
   }
 
   const counts = {};
-  rows.forEach(d=>{ counts[d.resumen] = (counts[d.resumen]||0) + 1; });
+  const casos = {};
+  rows.forEach(d=>{
+    counts[d.resumen] = (counts[d.resumen]||0) + 1;
+    (casos[d.resumen] = casos[d.resumen] || []).push(d);
+  });
   const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
 
   const listEl = document.getElementById('errorRankingList');
@@ -972,8 +980,25 @@ function renderErrorRanking(){
       <div class="err-bar-track"><div class="err-bar-fill" style="width:${pct}%"></div></div>
       <div class="err-count">${count}</div>
     `;
+    row.addEventListener('mouseenter', (e)=>showErrorTooltip(e, label, casos[label]));
+    row.addEventListener('mousemove', moveTooltip);
+    row.addEventListener('mouseleave', hideTooltip);
     listEl.appendChild(row);
   });
+}
+
+// Al pasar el mouse por un motivo: a qué centros pertenece (más reciente primero)
+function showErrorTooltip(evt, motivo, lista){
+  const MAX = 12;
+  const ordenada = lista.slice().sort((a,b)=> b.fecha.localeCompare(a.fecha));
+  let html = `<div class="tt-title">${motivo} · ${lista.length} caso${lista.length > 1 ? 's' : ''}</div>`;
+  ordenada.slice(0, MAX).forEach(c=>{
+    html += `<div class="tt-row"><b style="color:#fff;">${c.centro}</b> · ${c.empresa} · ${fmtDate(c.fecha)}</div>`;
+  });
+  if(ordenada.length > MAX) html += `<div class="tt-row">+${ordenada.length - MAX} más</div>`;
+  tooltip.innerHTML = html;
+  tooltip.classList.add('show');
+  moveTooltip(evt);
 }
 
 </script>
