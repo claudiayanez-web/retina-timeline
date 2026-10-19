@@ -914,7 +914,7 @@ function refreshErrMonthOptions(){
   let html = '<option value="__ALL__">Todos los meses</option>';
   Object.keys(porAnio).sort().reverse().forEach(y=>{
     html += `<optgroup label="${y}">` +
-      porAnio[y].map(m=>`<option value="${m}">${MESES_LARGO[+m.slice(5) - 1]} ${y}</option>`).join('') +
+      porAnio[y].map(m=>`<option value="${m}">${MESES_LARGO[+m.slice(5) - 1]}</option>`).join('') +
       '</optgroup>';
   });
   errMesFilter.innerHTML = html;
