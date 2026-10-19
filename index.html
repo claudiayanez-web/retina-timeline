@@ -79,6 +79,22 @@
     border-bottom:1px solid var(--line);
   }
   .err-row:hover{ background:#EFEEEA; }
+  .factor-legend{ display:flex; gap:24px; flex-wrap:wrap; margin:0 0 16px; font-size:13px; color:var(--ink); }
+  .factor-legend .lg{ display:flex; align-items:center; gap:8px; }
+  .factor-legend .sw{ width:12px; height:12px; border-radius:3px; flex:none; }
+  .factor-chart{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px 20px 14px; overflow-x:auto; }
+  .fc-body{ min-width:640px; }
+  .fc-plot{ position:relative; height:310px; }
+  .fc-inner{ position:absolute; left:34px; right:0; top:24px; bottom:0; border-bottom:1px solid var(--slate-light); }
+  .fc-grid{ position:absolute; left:0; right:0; border-top:1px dashed var(--line); }
+  .fc-grid span{ position:absolute; left:-34px; width:28px; text-align:right; font-size:11px; color:var(--slate-light); transform:translateY(-50%); }
+  .fc-cols{ position:relative; display:flex; gap:12px; height:100%; padding:0 6px; }
+  .fc-col{ flex:1; display:flex; flex-direction:column-reverse; height:100%; }
+  .fc-seg{ flex:none; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; cursor:default; }
+  .fc-seg:hover{ filter:brightness(1.12); }
+  .fc-total{ flex:none; text-align:center; font-size:12px; font-weight:700; color:var(--ink); padding-bottom:3px; }
+  .fc-months{ display:flex; gap:12px; padding:6px 6px 0 40px; }
+  .fc-months div{ flex:1; text-align:center; font-size:12px; color:var(--slate); }
   .err-row .err-label{
     width:280px;
     flex:none;
@@ -353,6 +369,7 @@
 <div id="tabBar">
   <button class="tab-btn active" id="tabBtnTimeline">Línea de tiempo</button>
   <button class="tab-btn" id="tabBtnErrors">Errores más comunes</button>
+  <button class="tab-btn" id="tabBtnFactors">Errores por factor</button>
 </div>
 
 <div id="tabTimelineContent">
@@ -445,6 +462,15 @@
       </div>
     </div>
     <div id="errorRankingList"></div>
+  </section>
+</div>
+
+<div id="tabFactorsContent" style="display:none;">
+  <section style="padding:26px 40px 40px;">
+    <h2 style="font-size:15px; font-weight:700; margin:0 0 4px;">Errores por factor — últimos 12 meses</h2>
+    <p id="factorSub" style="font-size:13px; color:var(--slate); margin:0 0 14px;"></p>
+    <div id="factorLegend" class="factor-legend"></div>
+    <div id="factorChart" class="factor-chart"></div>
   </section>
 </div>
 
@@ -873,24 +899,21 @@ function render(){
 render();
 
 // ---------- Tabs ----------
-const tabBtnTimeline = document.getElementById('tabBtnTimeline');
-const tabBtnErrors = document.getElementById('tabBtnErrors');
-const tabTimelineContent = document.getElementById('tabTimelineContent');
-const tabErrorsContent = document.getElementById('tabErrorsContent');
-
-tabBtnTimeline.addEventListener('click', ()=>{
-  tabBtnTimeline.classList.add('active');
-  tabBtnErrors.classList.remove('active');
-  tabTimelineContent.style.display = '';
-  tabErrorsContent.style.display = 'none';
-});
-tabBtnErrors.addEventListener('click', ()=>{
-  tabBtnErrors.classList.add('active');
-  tabBtnTimeline.classList.remove('active');
-  tabErrorsContent.style.display = '';
-  tabTimelineContent.style.display = 'none';
-  renderErrorRanking();
-});
+const TABS = {
+  timeline: { btn: document.getElementById('tabBtnTimeline'), box: document.getElementById('tabTimelineContent') },
+  errors:   { btn: document.getElementById('tabBtnErrors'),   box: document.getElementById('tabErrorsContent') },
+  factors:  { btn: document.getElementById('tabBtnFactors'),  box: document.getElementById('tabFactorsContent') },
+};
+function showTab(nombre){
+  Object.entries(TABS).forEach(([k, t])=>{
+    t.btn.classList.toggle('active', k === nombre);
+    t.box.style.display = (k === nombre) ? '' : 'none';
+  });
+  hideTooltip();
+  if(nombre === 'errors') renderErrorRanking();
+  if(nombre === 'factors') renderFactorChart();
+}
+Object.entries(TABS).forEach(([k, t])=> t.btn.addEventListener('click', ()=>showTab(k)));
 
 // ---------- Errores más comunes ----------
 const errTecFilter = document.getElementById('errTecFilter');
@@ -995,6 +1018,114 @@ function showErrorTooltip(evt, motivo, lista){
   let html = `<div class="tt-title">${motivo} · ${lista.length} caso${lista.length > 1 ? 's' : ''}</div>`;
   ordenada.slice(0, MAX).forEach(c=>{
     html += `<div class="tt-row"><b style="color:#fff;">${c.centro}</b> · ${c.empresa} · ${fmtDate(c.fecha)}</div>`;
+  });
+  if(ordenada.length > MAX) html += `<div class="tt-row">+${ordenada.length - MAX} más</div>`;
+  tooltip.innerHTML = html;
+  tooltip.classList.add('show');
+  moveTooltip(evt);
+}
+
+// ---------- Errores por factor (últimos 12 meses) ----------
+const FACTORES = [
+  { nombre: 'Factor equipo', color: '#D6493B' },
+  { nombre: 'Factor humano', color: '#C9862B' },
+  { nombre: 'Internet',      color: '#4A7FA8' },
+  { nombre: 'Factor centro', color: '#B05C8A' },
+];
+const MESES_ABR = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const etiquetaMesFactor = ym => `${MESES_ABR[+ym.slice(5, 7) - 1]} ${ym.slice(0, 4)}`;
+
+// Los 12 meses que terminan en el último mes con datos
+function ultimos12Meses(){
+  const ult = DATA.filter(d=>d.fecha).map(d=>d.fecha).reduce((a, b)=> a > b ? a : b);
+  let y = +ult.slice(0, 4), m = +ult.slice(5, 7);
+  const out = [];
+  for(let i = 0; i < 12; i++){
+    out.unshift(`${y}-${String(m).padStart(2, '0')}`);
+    m--; if(m === 0){ m = 12; y--; }
+  }
+  return out;
+}
+
+function renderFactorChart(){
+  const meses = ultimos12Meses();
+  const enVentana = DATA.filter(d=>d.tipo === 'Mantención correctiva' && d.fecha && meses.includes(d.fecha.slice(0, 7)));
+  const rows = enVentana.filter(d=>d.tipo_error);
+  const sinClasificar = enVentana.length - rows.length;
+
+  const porMes = {};
+  meses.forEach(m=>{ porMes[m] = {}; FACTORES.forEach(f=>{ porMes[m][f.nombre] = []; }); });
+  rows.forEach(d=>{ if(porMes[d.fecha.slice(0, 7)][d.tipo_error]) porMes[d.fecha.slice(0, 7)][d.tipo_error].push(d); });
+
+  document.getElementById('factorSub').textContent =
+    `Correctivas con tipo de error, de ${etiquetaMesFactor(meses[0])} a ${etiquetaMesFactor(meses[11])} (el último mes puede estar incompleto). No depende del filtro de año. Total: ${rows.length}.` +
+    (sinClasificar ? ` ${sinClasificar} sin tipo de error no se incluyen.` : '');
+
+  // Leyenda con totales
+  const tot = f => meses.reduce((a, m)=> a + porMes[m][f.nombre].length, 0);
+  document.getElementById('factorLegend').innerHTML = FACTORES.map(f=>{
+    const n = tot(f);
+    const pct = rows.length ? Math.round(n / rows.length * 100) : 0;
+    return `<div class="lg"><span class="sw" style="background:${f.color}"></span>${f.nombre} · <b>${n}</b> (${pct}%)</div>`;
+  }).join('');
+
+  const chart = document.getElementById('factorChart');
+  if(rows.length === 0){
+    chart.innerHTML = '<div style="padding:20px 0; color:var(--slate); font-size:14px;">No hay datos en estos 12 meses.</div>';
+    return;
+  }
+
+  // Escala del eje vertical
+  const totalesMes = meses.map(m=> FACTORES.reduce((a, f)=> a + porMes[m][f.nombre].length, 0));
+  const max = Math.max(...totalesMes);
+  const paso = max <= 10 ? 2 : (max <= 25 ? 5 : 10);
+  const yMax = Math.ceil(max / paso) * paso;
+  const pxPorUnidad = 286 / yMax;
+
+  let grid = '';
+  for(let v = paso; v <= yMax; v += paso){
+    grid += `<div class="fc-grid" style="bottom:${v / yMax * 100}%"><span>${v}</span></div>`;
+  }
+  chart.innerHTML = `
+    <div class="fc-body">
+      <div class="fc-plot"><div class="fc-inner">${grid}<div class="fc-cols" id="fcCols"></div></div></div>
+      <div class="fc-months">${meses.map(m=>`<div>${etiquetaMesFactor(m)}</div>`).join('')}</div>
+    </div>`;
+
+  const cols = document.getElementById('fcCols');
+  meses.forEach((m, i)=>{
+    const col = document.createElement('div');
+    col.className = 'fc-col';
+    FACTORES.forEach(f=>{
+      const lista = porMes[m][f.nombre];
+      if(lista.length === 0) return;
+      const seg = document.createElement('div');
+      seg.className = 'fc-seg';
+      seg.style.height = (lista.length / yMax * 100) + '%';
+      seg.style.background = f.color;
+      if(lista.length * pxPorUnidad >= 15) seg.textContent = lista.length;
+      seg.addEventListener('mouseenter', (e)=>showFactorTooltip(e, f.nombre, m, lista));
+      seg.addEventListener('mousemove', moveTooltip);
+      seg.addEventListener('mouseleave', hideTooltip);
+      col.appendChild(seg);
+    });
+    if(totalesMes[i] > 0){
+      const t = document.createElement('div');
+      t.className = 'fc-total';
+      t.textContent = totalesMes[i];
+      col.appendChild(t);
+    }
+    cols.appendChild(col);
+  });
+}
+
+// Al pasar el mouse por un tramo: qué casos son (más reciente primero)
+function showFactorTooltip(evt, factor, ym, lista){
+  const MAX = 10;
+  const ordenada = lista.slice().sort((a, b)=> b.fecha.localeCompare(a.fecha));
+  let html = `<div class="tt-title">${factor} · ${MESES_LARGO[+ym.slice(5, 7) - 1]} ${ym.slice(0, 4)}: ${lista.length} caso${lista.length > 1 ? 's' : ''}</div>`;
+  ordenada.slice(0, MAX).forEach(c=>{
+    html += `<div class="tt-row"><b style="color:#fff;">${c.centro}</b> · ${c.resumen || 'sin resumen'}</div>`;
   });
   if(ordenada.length > MAX) html += `<div class="tt-row">+${ordenada.length - MAX} más</div>`;
   tooltip.innerHTML = html;
