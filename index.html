@@ -84,11 +84,12 @@
   .gc-fila:last-child{ border-bottom:none; }
   .gc-fila.cab{ font-size:12px; font-weight:700; color:var(--slate); text-transform:uppercase; letter-spacing:.04em; padding:10px 0 8px; }
   .gc-tipo{ font-size:14px; font-weight:700; }
+  .gc-fila.cab small{ display:block; font-size:11.5px; font-weight:400; text-transform:none; letter-spacing:0; margin-top:2px; }
   .gc-tipo small{ display:block; font-size:12px; font-weight:400; color:var(--slate); }
   .gc-celda{ display:flex; align-items:center; gap:12px; }
   .gc-barra{ flex:1; height:16px; background:#EFEEEA; border-radius:5px; overflow:hidden; }
   .gc-relleno{ height:100%; background:var(--coral); border-radius:5px; }
-  .gc-num{ width:130px; flex:none; font-size:13px; white-space:nowrap; }
+  .gc-num{ width:165px; flex:none; font-size:13px; white-space:nowrap; }
   .gc-num b{ font-size:15px; }
   .gc-detalle{ background:var(--card); border:1px solid var(--line); border-radius:10px; max-height:520px; overflow:auto; }
   .gc-detalle table{ border-collapse:collapse; width:100%; font-size:13px; }
@@ -1369,11 +1370,11 @@ function renderGestion(){
     const ca = a.filter(r=>r.n30 > 0).length, cb = b.filter(r=>r.n60 > 0).length;
     const celda = (con, tot)=> tot === 0
       ? '<div class="gc-celda"><div class="gc-num">—</div></div>'
-      : `<div class="gc-celda"><div class="gc-barra"><div class="gc-relleno" style="width:${100 * con / tot}%"></div></div><div class="gc-num"><b>${Math.round(100 * con / tot)}%</b> · ${con} de ${tot}</div></div>`;
-    return `<div class="gc-fila"><div class="gc-tipo">${nombre}<small>${lista.length} visita${lista.length === 1 ? '' : 's'}</small></div>${celda(ca, a.length)}${celda(cb, b.length)}</div>`;
+      : `<div class="gc-celda"><div class="gc-barra"><div class="gc-relleno" style="width:${100 * con / tot}%"></div></div><div class="gc-num"><b>${Math.round(100 * con / tot)}%</b> · ${con} de ${tot} visitas</div></div>`;
+    return `<div class="gc-fila"><div class="gc-tipo">${nombre}</div>${celda(ca, a.length)}${celda(cb, b.length)}</div>`;
   };
   document.getElementById('gcResumen').innerHTML =
-    '<div class="gc-fila cab"><div>Tipo de visita</div><div>Gestión centro en 30 días</div><div>Gestión centro en 60 días</div></div>' +
+    '<div class="gc-fila cab"><div>Tipo de visita</div><div>Gestión centro en 30 días<small>de las visitas con 30 días cumplidos</small></div><div>Gestión centro en 60 días<small>de las visitas con 60 días cumplidos</small></div></div>' +
     TIPOS_GC.map(t=> fila(t.nombre, ok.filter(r=>r.v.tipo === t.clave))).join('') +
     fila('Todas', ok);
 
@@ -1391,7 +1392,7 @@ function renderGestion(){
     .sort((a, b)=> b.lista.length - a.lista.length || a.t.localeCompare(b.t, 'es'));
   document.getElementById('gcTecnicos').innerHTML = tecs.length === 0
     ? '<div style="padding:14px 0; color:var(--slate); font-size:14px;">No hay visitas para este filtro.</div>'
-    : '<div class="gc-fila cab"><div>Técnico</div><div>Gestión centro en 30 días</div><div>Gestión centro en 60 días</div></div>' +
+    : '<div class="gc-fila cab"><div>Técnico</div><div>Gestión centro en 30 días<small>de las visitas con 30 días cumplidos</small></div><div>Gestión centro en 60 días<small>de las visitas con 60 días cumplidos</small></div></div>' +
       tecs.map(x=> fila(escHtml(x.t), x.lista)).join('');
 
   // Detalle por visita (más reciente primero)
